@@ -1,65 +1,168 @@
-# Eulerity-Dynamic-Form-Builder by Madhura 
+# README
 
-# Dynamic Form Builder (Server-Driven UI)
+## Dynamic Form Builder (Eulerity Take-Home)
 
-A SwiftUI-based iOS application that demonstrates a **Server-Driven UI (SDUI)** architecture by dynamically generating forms from a JSON configuration file.
+### Overview
 
-This project was built as part of the **Eulerity iOS Developer Take-Home Exercise** and showcases modern iOS development practices including SwiftUI, MVVM, polymorphic JSON decoding, dynamic theming, validation, and defensive programming.
+This project implements a fully dynamic, JSON-driven form builder using SwiftUI and MVVM architecture. The application renders its UI entirely from a local JSON file bundled with the app, allowing new forms, themes, validation rules, and field configurations to be introduced without modifying application code.
+
+The solution emphasizes scalability, defensive parsing, maintainability, and production-grade architecture. All form elements are generated dynamically at runtime using Codable-based polymorphic decoding and SwiftUI composition.
 
 ---
 
-## Features
+## Architecture
 
-### Dynamic Form Rendering
+The project follows the MVVM (Model-View-ViewModel) pattern.
 
-The entire form UI is generated from JSON configuration without hardcoded screens.
+### Models
+
+Responsible for decoding and representing:
+
+* Form metadata
+* Theme configuration
+* Dynamic fields
+* Validation rules
+* Dropdown options
+* Field-specific configuration
+
+Key models include:
+
+* FormResponse
+* Theme
+* Field
+* FieldType
+* TextSubtype
+* DropdownOption
+
+### Service Layer
+
+#### JSONLoader
+
+Responsibilities:
+
+* Load local JSON from Bundle
+* Decode JSON safely
+* Handle malformed payloads
+* Return Result types
+* Isolate decoding logic from UI
+
+### ViewModel
+
+#### FormViewModel
+
+Responsibilities:
+
+* Load form definitions
+* Maintain field state
+* Track validation errors
+* Publish UI updates
+* Generate submission payload
+* Coordinate save actions
+
+### Views
+
+Views remain completely generic and data-driven.
+
+The renderer:
+
+1. Reads decoded field models
+2. Sorts fields using `field.order`
+3. Dynamically selects the appropriate SwiftUI component
+4. Binds values back to the ViewModel
 
 Supported field types:
 
-* **TEXT**
+* TEXT
+* DROPDOWN
+* TOGGLE
+* CHECKBOX
 
-  * Plain Text
-  * Multiline Text
-  * Number Input
-  * URI Input
-  * Secure Input
-
-* **DROPDOWN**
-
-  * Single Select
-  * Multi Select
-
-* **TOGGLE**
-
-  * Boolean Toggle
-
-* **CHECKBOX**
-
-  * Standard Checkbox
-  * Optional clickable metadata links
+Unknown field types are safely ignored.
 
 ---
 
-## Server-Driven UI (SDUI)
+## JSON Decoding Strategy
 
-The backend configuration controls:
+A polymorphic decoding strategy is used to support dynamic field rendering.
 
-* Field Types
-* Labels
-* Display Order
-* Validation Rules
-* Required Fields
-* Character Limits
-* Dropdown Options
-* Theme Colors
+Each field contains a `type` property.
 
-This allows new forms to be created or modified without changing application code.
+Examples:
+
+```json
+{
+  "type": "TEXT"
+}
+```
+
+```json
+{
+  "type": "DROPDOWN"
+}
+```
+
+During decoding:
+
+1. Type is decoded first.
+2. Matching enum case is selected.
+3. Type-specific properties are decoded.
+4. Unsupported types fall back to `.unknown`.
+
+Example:
+
+```json
+{
+  "type": "DATE_PICKER"
+}
+```
+
+Decodes successfully as:
+
+```swift
+case unknown
+```
+
+This prevents crashes when backend contracts evolve.
 
 ---
 
-## Dynamic Theming
+## Validation Strategy
 
-Theme values are provided through JSON and applied across the application.
+Validation occurs when the user taps **Save**.
+
+The validation engine supports:
+
+* Required field validation
+* Character limit enforcement
+* Regex validation
+* Toggle/checkbox validation
+* Dropdown selection validation
+
+Inline validation errors are displayed below the associated field.
+
+If a custom error message exists:
+
+```json
+{
+  "error_message": "Campaign name is required"
+}
+```
+
+the custom message is used.
+
+Otherwise a sensible default is generated:
+
+```text
+Campaign Name is required
+```
+
+Submission is blocked until all validations pass.
+
+---
+
+## Theme Engine
+
+The application supports runtime theming using JSON configuration.
 
 Example:
 
@@ -72,434 +175,227 @@ Example:
 }
 ```
 
-The application automatically updates:
+A custom `Color(hex:)` extension converts hex values into SwiftUI colors.
 
-* Background Colors
-* Text Colors
-* Border Colors
-* Error States
-* Accent Colors
+Theme values are applied dynamically to:
 
----
+* Backgrounds
+* Text
+* Borders
+* Validation states
+* Accent colors
+* Links
 
-## Validation
-
-The form includes support for:
-
-* Required Field Validation
-* Character Limit Enforcement
-* Dropdown Selection Validation
-* Checkbox Validation
-* Optional Regex Validation
-
-Validation errors are displayed inline to provide clear user feedback.
+Missing values safely fall back to defaults.
 
 ---
 
-## Defensive Parsing
+# Product Decisions
 
-Unknown field types are safely ignored.
+Several implementation decisions were made that were not explicitly defined in the assignment.
+
+## 1. Unknown Field Types Are Ignored
+
+### Decision
+
+Unsupported field types decode into:
+
+```swift
+case unknown
+```
+
+and are skipped during rendering.
+
+### Why
+
+Backend-driven forms often evolve independently from mobile releases.
+
+Ignoring unsupported fields prevents crashes and allows the remainder of the form to function normally.
+
+---
+
+## 2. Validation Runs On Save Instead Of On Every Keystroke
+
+### Decision
+
+Validation is triggered when the user taps Save.
+
+### Why
+
+The assignment explicitly required validation on save.
+
+Running validation continuously while typing can create a noisy experience, especially for required fields and regex validations.
+
+This approach keeps the UI cleaner while still enforcing correctness before submission.
+
+---
+
+## 3. Missing Theme Values Fall Back Gracefully
+
+### Decision
+
+Theme properties are optional and fallback values are provided.
 
 Example:
 
-```json
-{
-  "type": "DATE_PICKER"
-}
+```swift
+theme.errorColor ?? .red
 ```
 
-Instead of crashing, the application skips unsupported components and continues rendering the remaining form.
+### Why
 
-This approach makes the system forward-compatible with future backend updates.
+Theme payloads are often incomplete during development.
 
----
-
-# Architecture
-
-The project follows the MVVM (Model-View-ViewModel) architecture.
-
-```text
-DynamicFormBuilder
-│
-├── Models
-├── Services
-├── ViewModels
-├── Views
-├── Resources
-└── Tests
-```
-
-## Models
-
-Responsible for representing:
-
-* Form Configuration
-* Theme Configuration
-* Field Definitions
-* Dropdown Options
-* Validation Metadata
-
-Key files:
-
-* FormResponse.swift
-* Field.swift
-* Theme.swift
-* DropdownOption.swift
+Fallbacks ensure the application remains usable even when configuration is partially missing.
 
 ---
 
-## Services
+## 4. Character Limits Are Enforced During Input
 
-Responsible for:
+### Decision
 
-* Loading JSON from Bundle
-* Decoding Configuration
-* Error Handling
+Text fields truncate values exceeding the configured max length.
 
-Key file:
+### Why
 
-* JSONLoader.swift
+Preventing invalid input early simplifies validation logic and provides immediate feedback to the user.
 
 ---
 
-## ViewModels
+## What I Would Improve With More Time
 
-Responsible for:
+### 1. Accessibility
 
-* Form State Management
-* Validation Logic
-* Submission Handling
-* Dynamic Value Storage
+Add:
 
-Key file:
+* VoiceOver support
+* Accessibility labels
+* Accessibility hints
+* Dynamic Type support
 
-* FormViewModel.swift
+### 2. Localization
 
----
+Move all user-facing strings into localized resources and support multiple languages.
 
-## Views
+### 3. Remote Configuration
 
-Responsible for:
+Allow forms to be downloaded from an API while preserving offline support through caching.
 
-* Dynamic UI Rendering
-* User Interaction
-* Component Presentation
+### 4. Snapshot Testing
 
-Key files:
+Add snapshot tests for:
 
-* FormScreen.swift
-* DynamicFieldView.swift
-* TextFieldComponent.swift
-* DropdownComponent.swift
-* ToggleComponent.swift
-* CheckboxComponent.swift
+* Light mode
+* Dark mode
+* Theme variations
+* Validation states
 
----
+### 5. Advanced Form Logic
 
-# Project Structure
+Support:
 
-```text
-DynamicFormBuilder/
-│
-├── App/
-│   └── DynamicFormBuilderApp.swift
-│
-├── Models/
-│   ├── FormResponse.swift
-│   ├── Field.swift
-│   ├── Theme.swift
-│   └── DropdownOption.swift
-│
-├── Services/
-│   └── JSONLoader.swift
-│
-├── ViewModels/
-│   └── FormViewModel.swift
-│
-├── Views/
-│   ├── FormScreen.swift
-│   └── Components/
-│
-├── Resources/
-│   └── form.json
-│
-├── Tests/
-│   ├── DecoderTests.swift
-│   └── ValidationTests.swift
-│
-├── README.md
-└── AI_COLLABORATION_LOG.md
-```
+* Conditional visibility
+* Field dependencies
+* Dynamic sections
+* Computed values
+
+### 6. Analytics
+
+Track:
+
+* Validation failures
+* Field completion rates
+* Form abandonment
+
+### 7. Better Multi-Select Experience
+
+Replace the basic multi-select UI with a searchable selection sheet for large datasets.
 
 ---
 
-# Getting Started
+## Challenges Encountered
 
-## Requirements
+### Polymorphic JSON Decoding
+
+The most interesting challenge was supporting multiple field types while keeping the rendering layer generic.
+
+A straightforward Codable model becomes difficult when each field type contains different properties and validation requirements.
+
+To solve this:
+
+1. The field type is decoded first.
+2. A discriminator enum determines the rendering strategy.
+3. Unknown types safely fall back to `.unknown`.
+4. Views remain decoupled from JSON implementation details.
+
+This approach keeps the architecture scalable and makes introducing new field types straightforward.
+
+---
+
+## Running the Project
+
+### Requirements
 
 * Xcode 16+
-* Swift 5.10+
-* iOS 16.0+
-* macOS Sonoma or later
+* Swift 5.10
+* iOS 16+
+
+### Steps
+
+1. Clone the repository
+2. Open the Xcode project
+3. Build and run
+4. The form loads automatically from the bundled `form.json`
+
+No network access is required.
 
 ---
 
-## Installation
+## Unit Tests
 
-### Clone the repository
+The project includes tests for:
 
-```bash
-git clone https://github.com/your-username/dynamic-form-builder.git
-```
+* TEXT decoding
+* DROPDOWN decoding
+* Unknown field decoding
+* Theme parsing
+* Required field validation
+* Character limit enforcement
+* Validation engine behavior
 
-### Navigate into the project directory
-
-```bash
-cd dynamic-form-builder
-```
-
-### Open the project
-
-```bash
-open DynamicFormBuilder.xcodeproj
-```
-
-or
-
-```bash
-open DynamicFormBuilder.xcworkspace
-```
-
----
-
-## Run the Application
-
-1. Open the project in Xcode.
-2. Select an iOS Simulator.
-3. Press:
+Run:
 
 ```text
-⌘ + R
+⌘ + U
 ```
 
-4. The application will launch automatically.
+to execute the test suite.
 
 ---
 
-# Configuration
+## Submission Flow
 
-The form configuration is loaded from:
+1. User fills dynamic fields
+2. User taps Save
+3. Validation executes
+4. Errors are shown inline if needed
+5. Successful submissions generate a payload
+6. Payload is printed to the console
+7. Success alert is displayed
 
-```text
-Resources/form.json
-```
-
-To modify the form:
-
-1. Open `form.json`
-2. Add, remove, or modify fields
-3. Re-run the application
-
-No code changes are required.
-
----
-
-# Example Configuration
-
-```json
-{
-  "id": "campaign_name",
-  "type": "TEXT",
-  "subtype": "PLAIN",
-  "label": "Campaign Name",
-  "required": true
-}
-```
-
----
-
-# Using the Application
-
-### 1. Launch the App
-
-The application loads the JSON configuration and dynamically renders the form.
-
-### 2. Fill Required Fields
-
-Enter values for all required fields.
-
-### 3. Submit
-
-Tap the **Save** button.
-
-### 4. Validation
-
-If validation fails:
-
-* Inline errors are displayed
-* Missing required fields are highlighted
-
-### 5. Successful Submission
-
-A submission payload is generated and displayed.
-
-Example:
+Example payload:
 
 ```json
 {
   "campaign_name": "Summer Sale",
   "ad_networks": [
     "net_meta"
-  ],
-  "daily_budget": "500"
+  ]
 }
 ```
 
 ---
 
-# Testing
+## Conclusion
 
-The project includes unit tests covering:
-
-* JSON Decoding
-* Polymorphic Parsing
-* Validation Logic
-* Theme Parsing
-* Unknown Type Handling
-
-Run tests using:
-
-```text
-⌘ + U
-```
-
----
-
-# Product Decisions
-
-### 1. Ignore Unknown Component Types
-
-Unknown field types are skipped rather than causing failures.
-
-This ensures forward compatibility with future backend-driven UI updates.
-
-### 2. Validation Occurs On Save
-
-Validation is triggered when the user taps Save rather than during every keystroke.
-
-This creates a less intrusive user experience.
-
-### 3. Field Ordering Comes From JSON
-
-The application sorts fields using the `order` property.
-
-This allows the backend to control layout without requiring app updates.
-
----
-
-# Future Improvements
-
-Given additional time, the following enhancements would be implemented:
-
-* Remote API-driven form configuration
-* Accessibility improvements
-* Localization support
-* Snapshot testing
-* Additional component types
-
-  * Date Picker
-  * Radio Button
-  * Slider
-  * Stepper
-  * Image Picker
-* Analytics and event tracking
-
----
-
-# Challenges & Learnings
-
-### Polymorphic JSON Decoding
-
-One of the key challenges was decoding multiple field types from a single JSON array while maintaining type safety and extensibility.
-
-### Dynamic State Management
-
-The form supports multiple field value types and stores them dynamically while preserving validation and submission behavior.
-
-### Defensive Programming
-
-Special attention was given to handling:
-
-* Unknown field types
-* Missing optional fields
-* Invalid configurations
-* Empty dropdown options
-* Malformed payloads
-
-without causing application crashes.
-
----
-
-# Contributing
-
-Contributions are welcome.
-
-## Steps to Contribute
-
-### 1. Fork the Repository
-
-```bash
-git fork <repository-url>
-```
-
-### 2. Create a Feature Branch
-
-```bash
-git checkout -b feature/new-component
-```
-
-### 3. Commit Changes
-
-```bash
-git commit -m "Add new component"
-```
-
-### 4. Push Changes
-
-```bash
-git push origin feature/new-component
-```
-
-### 5. Open a Pull Request
-
-Submit a pull request with a clear description of the changes made.
-
----
-
-## Contribution Guidelines
-
-Please ensure:
-
-* Code follows MVVM architecture
-* SwiftLint warnings are resolved
-* Unit tests pass
-* New features include tests
-* Public APIs are documented
-
----
-
-# AI Collaboration
-
-As required by the assignment, AI-assisted tools were used during development.
-
-AI was leveraged for:
-
-* Architecture brainstorming
-* SwiftUI implementation guidance
-* JSON decoding strategies
-* Validation design discussions
-* Code review and refinement
-
-All generated code was reviewed, modified where necessary, tested, and fully understood before inclusion in the final solution.
-
----
+This implementation demonstrates a scalable, production-oriented approach to building a server-driven UI system using SwiftUI, MVVM, and polymorphic Codable decoding. The architecture is intentionally designed to be resilient to backend changes, easy to extend with new field types, and simple to maintain over time.
